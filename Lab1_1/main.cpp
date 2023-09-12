@@ -3,6 +3,10 @@
 
 #define MAIN_WINDOW_CLASS L"MainWindow"
 
+//Figure size error strings
+#define FIGURE_SIZE_ERROR_TEXT L"The size of the figure was too large for the window!"
+#define FIGURE_SIZE_ERROR_CAPTION L"Too large figure"
+
 //Window styles
 #define APP_NAME L"Figure Run"
 #define WINDOW_UPPER_BORDER 200
@@ -13,20 +17,25 @@
 
 //Figure physics
 #define FIGURE_DEFAULT_SPEED 10
+#define FIGURE_MOUSE_SPEED 1
 #define FIGURE_ACCELERATION 10
 #define FIGURE_BORDER_JUMP 15
 #define FIGURE_WIDTH_CORRECTION 15
 #define FIGURE_HEIGHT_CORRECTION 35
 
 //Figure styles
-#define FIGURE_START_X 100
-#define FIGURE_START_Y 100
-#define FIGURE_WIDTH 128
-#define FIGURE_HEIGHT 116
+#define FIGURE_WIDTH 200
+#define FIGURE_HEIGHT 100
+#define FIGURE_START_X (WINDOW_WIDTH / 2 - FIGURE_WIDTH / 2 - 15)
+#define FIGURE_START_Y (WINDOW_HEIGHT / 2 - FIGURE_HEIGHT / 2 - 25)
 #define BLACK_COLOR RGB(0,0,0)
 #define BACKGROUND_COLOR RGB(50,50,50)
 #define DARK_GRAY_COLOR RGB(50,50,50)
+#define RED_COLOR RGB(255, 100, 100)
 #define FIGURE_SPRITE_COLOR RGB(100,100,255)
+#define FIGURE_IMAGE_SRC L"dorik1.bmp"
+#define MAX_FIGURE_WIDTH (WINDOW_WIDTH - 50)
+#define MAX_FIGURE_HEIGHT (WINDOW_HEIGHT - 50)
 
 void ShowFigureJump(HWND hWnd);
 
@@ -78,7 +87,7 @@ void ChangeFigureCoordinates(HWND hWnd, int x, int y)
 
 void DrawFigure(HDC hDc, HWND hWnd)
 {
-	Gdiplus::Image figure(L"dorik.bmp");
+	Gdiplus::Image figure(FIGURE_IMAGE_SRC);
 	if (!figure.GetLastStatus())
 	{
 		Gdiplus::Graphics graphics(hDc);
@@ -86,10 +95,10 @@ void DrawFigure(HDC hDc, HWND hWnd)
 	}
 	else
 	{
-		HBRUSH brushR = CreateSolidBrush(FIGURE_SPRITE_COLOR);
-		SelectObject(hDc, brushR);
+		HBRUSH figureBrush = CreateSolidBrush(FIGURE_SPRITE_COLOR);
+		SelectObject(hDc, figureBrush);
 		Rectangle(hDc, FigureCoordinates.x, FigureCoordinates.y, FigureCoordinates.x + FigureCoordinates.width, FigureCoordinates.y + FigureCoordinates.height);
-		DeleteObject(brushR);
+		DeleteObject(figureBrush);
 	}
 }
 
@@ -97,14 +106,24 @@ void ShowFigureJump(HWND hWnd)
 {
 	if (!CheckBorder(FigureCoordinates.x, FigureCoordinates.width, WINDOW_WIDTH - FIGURE_WIDTH_CORRECTION))
 	{
-		DrawFigure(GetDC(hWnd), hWnd);
+		HPEN borderPen = CreatePen(PS_SOLID, 1, RED_COLOR);
+		HDC hDc = GetDC(hWnd);
+		SelectObject(hDc, borderPen);
+		DrawFigure(hDc, hWnd);
+		DeleteObject(borderPen);
+		ReleaseDC(hWnd, hDc);
 		FigureCoordinates.x += FigureCoordinates.x == 0 ? FIGURE_BORDER_JUMP : -FIGURE_BORDER_JUMP;
 		Sleep(100);
 		InvalidateRect(hWnd, NULL, TRUE);
 	}
 	if (!CheckBorder(FigureCoordinates.y, FigureCoordinates.height, WINDOW_HEIGHT - FIGURE_HEIGHT_CORRECTION))
 	{
-		DrawFigure(GetDC(hWnd), hWnd);
+		HPEN borderPen = CreatePen(PS_SOLID, 1, RED_COLOR);
+		HDC hDc = GetDC(hWnd);
+		SelectObject(hDc, borderPen);
+		DrawFigure(hDc, hWnd);
+		DeleteObject(borderPen);
+		ReleaseDC(hWnd, hDc);
 		FigureCoordinates.y += FigureCoordinates.y == 0 ? FIGURE_BORDER_JUMP : -FIGURE_BORDER_JUMP;
 		Sleep(100);
 		InvalidateRect(hWnd, NULL, TRUE);
@@ -115,7 +134,7 @@ void DrawMainWindow(HWND hWnd)
 {
 	PAINTSTRUCT ps;
 	HDC hDc = BeginPaint(hWnd, &ps);
-	HPEN clearBorder = CreatePen(PS_NULL, 1, BLACK_COLOR);
+	HPEN clearBorder = CreatePen(PS_NULL, 0, BLACK_COLOR);
 	SelectObject(hDc, clearBorder);
 	HBRUSH brush = CreateSolidBrush(BACKGROUND_COLOR);
 	SelectObject(hDc, brush);
@@ -160,11 +179,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		int speed;
 		if (GetAsyncKeyState(VK_SPACE) < 0)
 		{
-			speed = FIGURE_DEFAULT_SPEED + FIGURE_ACCELERATION;
+			speed = FIGURE_MOUSE_SPEED + FIGURE_ACCELERATION;
 		}
 		else
 		{
-			speed = FIGURE_DEFAULT_SPEED;
+			speed = FIGURE_MOUSE_SPEED;
 		}
 		if (GET_KEYSTATE_WPARAM(wParam) != MK_SHIFT)
 		{
@@ -183,11 +202,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		int speed;
 		if (GetAsyncKeyState(VK_SPACE) < 0)
 		{
-			speed = FIGURE_DEFAULT_SPEED + FIGURE_ACCELERATION;
+			speed = FIGURE_MOUSE_SPEED + FIGURE_ACCELERATION;
 		}
 		else
 		{
-			speed = FIGURE_DEFAULT_SPEED;
+			speed = FIGURE_MOUSE_SPEED;
 		}
 		if (GET_KEYSTATE_WPARAM(wParam) != MK_SHIFT)
 		{
@@ -223,17 +242,43 @@ void InitWindowClass(WNDPROC proc, HINSTANCE hInstance, HBRUSH hBrush, const wch
 	RegisterClassEx(&wcex);
 }
 
+void CorrectFigureParameters(HWND hWnd) noexcept
+{
+	if (FIGURE_WIDTH > MAX_FIGURE_WIDTH)
+	{
+		FigureCoordinates.x = 1;
+		FigureCoordinates.width = MAX_FIGURE_WIDTH;
+	}
+	else
+	{
+		FigureCoordinates.x = FIGURE_START_X;
+		FigureCoordinates.width = FIGURE_WIDTH + 1;
+	}
+	if (FIGURE_HEIGHT > MAX_FIGURE_HEIGHT)
+	{
+		FigureCoordinates.y = 1;
+		FigureCoordinates.height = MAX_FIGURE_HEIGHT;
+	}
+	else
+	{
+		FigureCoordinates.height = FIGURE_HEIGHT + 1;
+		FigureCoordinates.y = FIGURE_START_Y;
+	}
+	if (FIGURE_WIDTH > MAX_FIGURE_WIDTH || FIGURE_HEIGHT > MAX_FIGURE_HEIGHT)
+	{
+		MessageBoxW(hWnd, FIGURE_SIZE_ERROR_TEXT, FIGURE_SIZE_ERROR_CAPTION, MB_OK);
+	}
+}
+
 INT WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) 
 {
 	HWND hMainWindow;
 	MSG msg;
 	InitWindowClass(WndProc, hInstance, (HBRUSH)(0), MAIN_WINDOW_CLASS);
-	FigureCoordinates.width = FIGURE_WIDTH;
-	FigureCoordinates.height = FIGURE_HEIGHT;
-	FigureCoordinates.x = FIGURE_START_X;
-	FigureCoordinates.y = FIGURE_START_Y;
 	hMainWindow = CreateWindowExW(0, MAIN_WINDOW_CLASS, APP_NAME, MAIN_WINDOW_STYLE, WINDOW_LEFT_BORDER, WINDOW_UPPER_BORDER, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, hInstance, NULL);
 	
+	CorrectFigureParameters(hMainWindow);
+
 	const Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
 	GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
